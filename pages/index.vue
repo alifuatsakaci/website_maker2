@@ -1,138 +1,243 @@
 <template>
   <div class="landing-page">
-    <!-- Left column: title + nav -->
+    <!-- Left column: title + navigation -->
     <div class="landing-page__content">
-      <h1 class="landing-page__title">Ali Fuat Sakaci</h1>
+      <div class="landing-page__link landing-page__link--title">
+        Ali Fuat Sakaci
+      </div>
       <nav class="landing-page__nav">
-        <NuxtLink class="landing-page__link landing-page__link--portfolio" to="/home">PORTFOLIO</NuxtLink>
-        <NuxtLink class="landing-page__link" to="/portfolio">ME</NuxtLink>
-        <NuxtLink class="landing-page__link" to="/about">ABOUT</NuxtLink>
-        <NuxtLink class="landing-page__link" to="/contact">CONTACT</NuxtLink>
+        <NuxtLink
+          class="landing-page__link landing-page__link--portfolio"
+          to="/home"
+          >PORTFOLIO</NuxtLink
+        >
+        <NuxtLink
+          class="landing-page__link landing-page__link--me"
+          to="/portfolio"
+          >ME</NuxtLink
+        >
+        <NuxtLink
+          class="landing-page__link landing-page__link--about"
+          to="/about"
+          >ABOUT</NuxtLink
+        >
+        <NuxtLink
+          class="landing-page__link landing-page__link--contact"
+          to="/contact"
+          >CONTACT</NuxtLink
+        >
       </nav>
     </div>
 
-    <!-- Right column: photo fullscreen -->
+    <!-- Right column: canvas-based slideshow -->
     <div class="landing-page__hero">
-      <img
-        class="landing-page__photo"
-        :src="photo"
-        alt="Ali Fuat Sakaci"
-      />
+      <canvas ref="heroCanvas" class="landing-page__canvas"></canvas>
     </div>
   </div>
 </template>
 
 <script setup>
-import photo from '~/assets/images/IMG_4822.jpg'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
+
+// 1️⃣ Grab every JPG in assets/images
+const modules = import.meta.glob('@/assets/images/*.jpg', {
+  eager: true,
+  import: 'default',
+})
+const imageURLs = Object.values(modules)
+
+// 2️⃣ Refs & state
+const heroCanvas = ref(null)
+let ctx, cw, ch
+let images = []      // HTMLImageElements
+let current = 0      // current image index
+let nextIndex = 0
+let intervalId = null
+let rafId = null     // for requestAnimationFrame
+
+// 3️⃣ Resize helper
+function resizeCanvas() {
+  const canvas = heroCanvas.value
+  cw = (canvas.width = canvas.clientWidth)
+  ch = (canvas.height = canvas.clientHeight)
+  ctx.clearRect(0, 0, cw, ch)
+  if (images[current]?.complete) {
+    ctx.drawImage(images[current], 0, 0, cw, ch)
+  }
+}
+
+// 4️⃣ Slide animation
+function startSlide() {
+  nextIndex = (current + 1) % images.length
+  const duration = 600 // ms
+  const start = performance.now()
+
+  function animate(time) {
+    const t = Math.min((time - start) / duration, 1) // 0 → 1
+    const offset = -t * cw
+
+    ctx.clearRect(0, 0, cw, ch)
+    ctx.drawImage(images[current], offset, 0, cw, ch)
+    ctx.drawImage(images[nextIndex], offset + cw, 0, cw, ch)
+
+    if (t < 1) {
+      rafId = requestAnimationFrame(animate)
+    } else {
+      current = nextIndex
+    }
+  }
+
+  rafId = requestAnimationFrame(animate)
+}
+
+// 5️⃣ Lifecycle
+onMounted(() => {
+  // create Image objects
+  images = imageURLs.map((url) => {
+    const img = new Image()
+    img.src = url
+    return img
+  })
+
+  // init canvas context
+  const canvas = heroCanvas.value
+  ctx = canvas.getContext('2d')
+
+  // initial draw & resize listener
+  window.addEventListener('resize', resizeCanvas)
+  images.forEach((img) => (img.onload = resizeCanvas))
+
+  // start the 5s slideshow
+  intervalId = setInterval(startSlide, 5000)
+})
+
+onBeforeUnmount(() => {
+  clearInterval(intervalId)
+  cancelAnimationFrame(rafId)
+  window.removeEventListener('resize', resizeCanvas)
+})
 </script>
 
 <style scoped>
-/* Full viewport two-column grid */
-.landing-page {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  min-height: 100vh;
-  margin: 0;
-}
-
-/* Left: name and nav */
-.landing-page__content {
-  position: relative;      /* enable absolute children */
-  padding: 4rem;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: flex-start;
-  background-color: #fff;
-}
-
-.landing-page__title {
-  position: absolute;
-  top: 82px;
-  left: 204px;
-  font-family: serif;
-  /* Updated font-size to match Adobe XD */
-  font-size: 103px;
+/* Import DIN Condensed */
+@font-face {
+  font-family: 'DIN Condensed';
+  src: url('@/assets/fonts/DINCondensed.woff2') format('woff2'),
+       url('@/assets/fonts/DINCondensed.woff') format('woff');
   font-weight: normal;
-  margin: 0;
+  font-style: normal;
 }
 
-.landing-page__nav {
-  margin-top: 200px; /* push nav below title */
-  display: flex;
-  flex-direction: column;
-}
-
-.landing-page__link {
-  font-family: serif;
-  font-size: 8rem;
-  line-height: 1;
-  text-decoration: none;
-  color: #111;
-  margin: 0.2rem 0;
-  text-transform: uppercase;
-}
-
-/* Positioning for the PORTFOLIO link per design spec */
-.landing-page__link--portfolio {
-  position: absolute;
-  top: 204px;
-  left: 204px;
-  font-size: 229px;
-  margin: 0;
-}
-
-/* Right: photo covers entire column */
-.landing-page__hero {
+/* Full viewport, no scrolling, light gray background */
+.landing-page {
   position: relative;
   width: 100%;
   height: 100vh;
   overflow: hidden;
+  margin: 0;
+  
 }
 
-.landing-page__photo {
+/* Left: text overlay */
+.landing-page__content {
   position: absolute;
   top: 0;
   left: 0;
-  width: 100%;
+  width: 50%;
   height: 100%;
-  object-fit: cover;
+  z-index: 2;
+  background-color: #fff; /* prevent slideshow showing through */
 }
 
-/* Responsive: stack content and shrink font-sizes */
+/* Right: canvas slideshow */
+.landing-page__hero {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 50%;
+  height: 100%;
+  z-index: 1;
+  overflow: hidden;
+}
+.landing-page__canvas {
+  width: 100%;
+  height: 100%;
+  display: block; /* remove inline gap */
+}
+
+/* Text positioning & underline animation */
+.landing-page__link {
+  font-family: 'DIN Condensed', sans-serif;
+  position: absolute;
+  line-height: 1;
+  text-decoration: none;
+  color: #111;
+  text-transform: uppercase;
+  margin: 0;
+  overflow: visible;
+}
+
+/* Slide‐in underline */
+.landing-page__link::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -4px;       /* tweak to sit just under text */
+  width: 0;
+  height: 5px;
+  background: #111;   /* match your text color */
+}
+
+.landing-page__link:hover::after {
+  width: 100%;
+  cursor: pointer;
+}
+
+/* Individual link/title positioning */
+.landing-page__link--title {
+  top: 60px;
+  left: 85px;
+  font-size: clamp(2rem, 6vw, 60px);
+}
+.landing-page__link--portfolio {
+  top: 200px;
+  left: 85px;
+  font-size: clamp(2rem, 10vw, 130px);
+}
+.landing-page__link--me {
+  top: 350px;
+  left: 85px;
+  font-size: clamp(2rem, 10vw, 130px);
+}
+.landing-page__link--about {
+  top: 500px;
+  left: 85px;
+  font-size: clamp(2rem, 10vw, 130px);
+}
+.landing-page__link--contact {
+  top: 650px;
+  left: 85px;
+  font-size: clamp(2rem, 10vw, 130px);
+}
+
+/* Stack on mobile */
 @media (max-width: 768px) {
-  .landing-page {
-    grid-template-columns: 1fr;
-  }
-  .landing-page__content {
-    padding: 2rem;
-    align-items: center;
-    text-align: center;
-  }
-  .landing-page__title {
-    position: static;
-    font-size: 2rem;
-    margin-bottom: 1.5rem;
-    left: auto;
-    top: auto;
-  }
-  .landing-page__nav {
-    margin-top: 0;
-    flex-direction: row;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 1rem;
-  }
-  .landing-page__link {
-    font-size: 2.5rem;
-  }
+  .landing-page__content,
   .landing-page__hero {
-    height: auto;
-  }
-  .landing-page__photo {
     position: static;
     width: 100%;
     height: auto;
+  }
+  .landing-page__content {
+    padding: 2rem;
+    background: #fff;
+  }
+  .landing-page__link {
+    position: static;
+    font-family: 'DIN Condensed', sans-serif;
+    font-size: 2.5rem;
+    display: block;
+    margin: 0.5em 0;
   }
 }
 </style>
